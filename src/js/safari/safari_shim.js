@@ -17,7 +17,7 @@ var safariShim = {
     if (typeof window === 'object' && window.RTCPeerConnection &&
         !('addStream' in window.RTCPeerConnection.prototype)) {
       RTCPeerConnection.prototype.addStream = function(stream) {
-        stream.getTracks().forEach(track => this.addTrack(track, stream));
+        stream.getTracks().forEach(function(track) { this.addTrack(track, stream); });
       };
     }
   },
