@@ -279,9 +279,13 @@ var chromeShim = {
       pc._reverseStreams = pc._reverseStreams || {};
 
       origRemoveStream.apply(pc, [(pc._streams[stream.id] || stream)]);
+
+      var origStreamId =  pc._reverseStreams[(pc._streams[stream.id] ?
+          pc._streams[stream.id].id : stream.id)].id;
+
       delete pc._reverseStreams[(pc._streams[stream.id] ?
           pc._streams[stream.id].id : stream.id)];
-      delete pc._streams[stream.id];
+      delete pc._streams[origStreamId];
     };
 
     window.RTCPeerConnection.prototype.addTrack = function(track, stream) {
@@ -292,17 +296,6 @@ var chromeShim = {
           'InvalidStateError');
       }
       var streams = [].slice.call(arguments, 1);
-      if (streams.length !== 1 ||
-          !streams[0].getTracks().find(function(t) {
-            return t === track;
-          })) {
-        // this is not fully correct but all we can manage without
-        // [[associated MediaStreams]] internal slot.
-        throw new DOMException(
-          'The adapter.js addTrack polyfill only supports a single ' +
-          ' stream which is associated with the specified track.',
-          'NotSupportedError');
-      }
 
       var alreadyExists = pc.getSenders().find(function(s) {
         return s.track === track;
