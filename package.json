@@ -20,7 +20,7 @@
   },
   "dependencies": {
     "grunt-shell": "^2.1.0",
-    "rtcpeerconnection-shim": "tgourgues/rtcpeerconnection-shim#develop",
+    "rtcpeerconnection-shim": "^1.1.6",
     "sdp": "^2.3.0"
   },
   "engines": {
