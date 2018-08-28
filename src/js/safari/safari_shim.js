@@ -131,6 +131,19 @@ module.exports = {
         return origSetRemoteDescription.apply(pc, arguments);
       };
     }
+    if (!('onremovestream' in window.RTCPeerConnection.prototype)) {
+      Object.defineProperty(window.RTCPeerConnection.prototype, 'onremovestream', {
+        get: function() {
+          return this._onremovestream;
+        },
+        set: function(f) {
+          if (this._onremovestream) {
+            this.removeEventListener('removestream', this._onremovestream);
+          }
+          this.addEventListener('removestream', this._onremovestream = f);
+        }
+      });
+    }
   },
   shimCallbacksAPI: function(window) {
     if (typeof window !== 'object' || !window.RTCPeerConnection) {
@@ -174,7 +187,31 @@ module.exports = {
     prototype.setLocalDescription = withCallback;
 
     withCallback = function(description, successCallback, failureCallback) {
-      var promise = setRemoteDescription.apply(this, [description]);
+      var pc = this;
+      var originalStreams = {};
+      pc.getRemoteStreams().forEach(function(stream) {
+        originalStreams[stream.id] = stream;
+      });
+      
+      var promise = setRemoteDescription.apply(this, [description]).then(function() {
+        var streams = {};
+        pc.getRemoteStreams().forEach(function(stream) {
+          streams[stream.id] = stream;
+        });
+        
+        Object.keys(originalStreams).forEach(function(sid) {
+          var stream = originalStreams[sid];
+          if (streams[sid] !== stream) {
+            var event = new Event('removestream');
+            event.stream = stream;
+            
+            window.setTimeout(function() {
+              pc.dispatchEvent(event);
+            }, 1);
+          }
+        });
+      });
+
       if (!failureCallback) {
         return promise;
       }
