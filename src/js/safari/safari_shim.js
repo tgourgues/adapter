@@ -112,19 +112,17 @@ module.exports = {
           window.RTCPeerConnection.prototype.setRemoteDescription;
       window.RTCPeerConnection.prototype.setRemoteDescription = function() {
         var pc = this;
+        pc._tmpStreams = [];
+        if (!pc._remoteStreams) {
+            pc._remoteStreams = [];
+        }
         if (!this._onaddstreampoly) {
           this.addEventListener('track', this._onaddstreampoly = function(e) {
             e.streams.forEach(function(stream) {
-              if (!pc._remoteStreams) {
-                pc._remoteStreams = [];
-              }
-              if (pc._remoteStreams.indexOf(stream) >= 0) {
+              if (pc._tmpStreams.indexOf(stream) >= 0) {
                 return;
               }
-              pc._remoteStreams.push(stream);
-              var event = new Event('addstream');
-              event.stream = stream;
-              pc.dispatchEvent(event);
+              pc._tmpStreams.push(stream);
             });
           });
         }
@@ -192,24 +190,44 @@ module.exports = {
       pc.getRemoteStreams().forEach(function(stream) {
         originalStreams[stream.id] = stream;
       });
-      
+
       var promise = setRemoteDescription.apply(this, [description]).then(function() {
         var streams = {};
-        pc.getRemoteStreams().forEach(function(stream) {
+        pc._tmpStreams.forEach(function(stream) {
           streams[stream.id] = stream;
         });
-        
-        Object.keys(originalStreams).forEach(function(sid) {
-          var stream = originalStreams[sid];
-          if (streams[sid] !== stream) {
-            var event = new Event('removestream');
-            event.stream = stream;
-            
-            window.setTimeout(function() {
-              pc.dispatchEvent(event);
-            }, 1);
-          }
-        });
+
+          Object.keys(streams).forEach(function(sid) {
+              var stream = streams[sid];
+              if (pc._remoteStreams.indexOf(stream) === -1) {
+                  pc._remoteStreams.push(stream);
+                  var event = new Event('addstream');
+                  event.stream = stream;
+                  window.setTimeout(function() {
+                      pc.dispatchEvent(event);
+                  });
+              }
+          });
+
+          Object.keys(originalStreams).forEach(function(sid) {
+            var stream = originalStreams[sid];
+            if (streams[sid] !== stream) {
+              var event = new Event('removestream');
+              event.stream = stream;
+                window.setTimeout(function() {
+
+                var index = -1;
+                pc._remoteStreams.forEach(function(s, i) {
+                    if (s === stream) {index = i;}
+                });
+                if (index !== -1) {
+                    pc._remoteStreams.splice(index, 1);
+                }
+
+                pc.dispatchEvent(event);
+              }, 1);
+            }
+          });
       });
 
       if (!failureCallback) {
