@@ -7,7 +7,7 @@
  */
 'use strict';
 var utils = require('../utils');
-
+var sendAddStreamEvent = false;
 module.exports = {
   shimLocalStreamsAPI: function(window) {
     if (typeof window !== 'object' || !window.RTCPeerConnection) {
@@ -96,7 +96,8 @@ module.exports = {
         return this._remoteStreams ? this._remoteStreams : [];
       };
     }
-    if (!('onaddstream' in window.RTCPeerConnection.prototype)) {
+    sendAddStreamEvent = !('onaddstream' in window.RTCPeerConnection.prototype);
+    if (sendAddStreamEvent) {
       Object.defineProperty(window.RTCPeerConnection.prototype, 'onaddstream', {
         get: function() {
           return this._onaddstream;
@@ -108,6 +109,8 @@ module.exports = {
           this.addEventListener('addstream', this._onaddstream = f);
         }
       });
+    }
+
       var origSetRemoteDescription =
           window.RTCPeerConnection.prototype.setRemoteDescription;
       window.RTCPeerConnection.prototype.setRemoteDescription = function() {
@@ -128,7 +131,6 @@ module.exports = {
         }
         return origSetRemoteDescription.apply(pc, arguments);
       };
-    }
     if (!('onremovestream' in window.RTCPeerConnection.prototype)) {
       Object.defineProperty(window.RTCPeerConnection.prototype, 'onremovestream', {
         get: function() {
@@ -201,11 +203,13 @@ module.exports = {
               var stream = streams[sid];
               if (pc._remoteStreams.indexOf(stream) === -1) {
                   pc._remoteStreams.push(stream);
-                  var event = new Event('addstream');
-                  event.stream = stream;
-                  window.setTimeout(function() {
-                      pc.dispatchEvent(event);
-                  });
+                  if (sendAddStreamEvent) {
+                      var event = new Event('addstream');
+                      event.stream = stream;
+                      window.setTimeout(function() {
+                        pc.dispatchEvent(event);
+                      });
+                  }
               }
           });
 
